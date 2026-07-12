@@ -96,11 +96,13 @@ export function OverviewCards({
   riesgoPais,
   inflacion,
   indices,
+  commodities,
 }: {
   dolares: DolarQuote[];
   riesgoPais: RiesgoPais | null;
   inflacion: number | null;
   indices: Instrument[];
+  commodities: Instrument[];
 }) {
   const featured = dolares.filter((d) =>
     ["blue", "bolsa", "contadoconliqui", "oficial"].includes(d.casa)
@@ -122,6 +124,19 @@ export function OverviewCards({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {indices.map((i) => (
               <IndexChip key={i.id} i={i} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {commodities.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-mute">
+            Commodities
+          </h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {commodities.map((c) => (
+              <IndexChip key={c.id} i={c} />
             ))}
           </div>
         </div>
