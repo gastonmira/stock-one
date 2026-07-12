@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<div align="center">
 
-## Getting Started
+# StockOne 📈🇦🇷
 
-First, run the development server:
+**Every financial value in Argentina, in one place.**
+
+Dollars (blue · MEP · CCL · oficial), country risk, stocks, bonds, CEDEARs, letras and US indices — live, searchable, and free.
+
+🔗 **[stockone-nu.vercel.app](https://stockone-nu.vercel.app)**
+
+![StockOne dashboard](docs/home.png)
+
+</div>
+
+---
+
+## 🧪 The experiment
+
+This whole app was built **in a single sitting — during a World Cup match** (England vs Norway on the clock), as a challenge: ship a real, production web app before the final whistle.
+
+Two reasons: to keep the pre-match nerves down before Argentina played, and to sharpen my AI skills by actually building *with* AI, using **[Claude Code](https://claude.com/claude-code)**.
+
+The workflow was fully iterative: **ship → look at it → spot something wrong → fix → ship again**, minutes per loop. The MVP went live first, and every feature after that was its own small iteration.
+
+## ✨ Features
+
+- **Live dashboard** — dollar rates (blue, MEP, CCL, oficial), country risk & inflation, and US indices (Nasdaq, S&P 500, Dow…) with sparklines.
+- **Global search** — find any stock, CEDEAR, bond, letra or index by symbol or name.
+- **Currency converter** — USD ⇄ ARS across every dollar type, with live formatting.
+- **Top movers** — biggest gainers and losers of the day.
+- **Detail pages** (`/i/[category]/[symbol]`) — historical price chart with range selector (1M/6M/1Y/5Y), key stats, latest news in Spanish (last 30 days), and an auto-generated **company profile from Wikipedia**.
+- **Sortable, paginated tables** (25 per page) per category.
+- **SEO** — dynamic Open Graph / Twitter images, sitemap, robots, JSON-LD.
+
+![Detail page](docs/detail.png)
+
+## 🗂️ Data sources (all free & public)
+
+| What | Source |
+| --- | --- |
+| Dollar rates | [dolarapi.com](https://dolarapi.com) |
+| Country risk & inflation | [argentinadatos.com](https://argentinadatos.com) |
+| Stocks / CEDEARs / bonds / letras | [data912.com](https://data912.com) |
+| Historical prices & US indices | Yahoo Finance |
+| News | Google News RSS |
+| Company profiles | Wikipedia (ES) |
+
+No API keys, **no database** — just live data with smart ISR caching.
+
+## 🧱 Tech stack
+
+- **[Next.js](https://nextjs.org)** (App Router) + **TypeScript**
+- **Tailwind CSS v4**
+- **[Vercel](https://vercel.com)** — hosting + Web Analytics
+- SVG charts hand-rolled (no chart library)
+
+## 🏗️ How it works
+
+- `lib/sources.ts` — typed fetchers for each source, normalized to a common `Instrument` model. Everything runs through `Promise.allSettled`, so one failing source never breaks the page.
+- Server Components fetch on the server with `revalidate` (ISR) caching (60s for market data, longer for news/profiles) to stay fast and avoid hammering the APIs.
+- `app/api/market` and `app/api/history` expose cached JSON for client-side refresh and the chart range selector.
+- Detail pages are server-rendered per instrument and individually indexable.
+
+## 🚀 Run it locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Build:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build && npm start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## ☁️ Deploy
 
-## Learn More
+Deployed on Vercel. Any push (or `vercel --prod`) ships it.
 
-To learn more about Next.js, take a look at the following resources:
+## ⚠️ Disclaimer
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+For informational purposes only. Data may be delayed or inaccurate and is **not** investment advice.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 👤 Author
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Built by **[Gastón Mira](https://www.gastonmira.dev)** with [Claude Code](https://claude.com/claude-code).
