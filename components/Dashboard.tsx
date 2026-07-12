@@ -108,6 +108,7 @@ export function Dashboard({ initial }: { initial: MarketData }) {
         riesgoPais={market.riesgoPais}
         inflacion={market.inflacion}
         indices={market.indices}
+        commodities={market.commodities}
       />
 
       {/* Búsqueda */}

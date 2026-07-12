@@ -97,6 +97,14 @@ export const STOCK_NAMES: Record<string, string> = {
   CAPX: "Capex",
 };
 
+export const COMMODITY_META: { symbol: string; yahoo: string; name: string }[] =
+  [
+    { symbol: "CL", yahoo: "CL=F", name: "Petróleo WTI" },
+    { symbol: "BZ", yahoo: "BZ=F", name: "Petróleo Brent" },
+    { symbol: "GC", yahoo: "GC=F", name: "Oro" },
+    { symbol: "ZS", yahoo: "ZS=F", name: "Soja" },
+  ];
+
 export const INDEX_META: { symbol: string; yahoo: string; name: string }[] = [
   { symbol: "IXIC", yahoo: "^IXIC", name: "Nasdaq Composite" },
   { symbol: "NDX", yahoo: "^NDX", name: "Nasdaq 100" },

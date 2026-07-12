@@ -35,6 +35,7 @@ export interface MarketData {
   cedears: Instrument[];
   bonos: Instrument[];
   letras: Instrument[];
+  commodities: Instrument[];
   generatedAt: string;
 }
 

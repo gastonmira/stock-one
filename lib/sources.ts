@@ -5,7 +5,7 @@ import type {
   MarketData,
   RiesgoPais,
 } from "./types";
-import { CEDEAR_NAMES, INDEX_META, STOCK_NAMES } from "./names";
+import { CEDEAR_NAMES, COMMODITY_META, INDEX_META, STOCK_NAMES } from "./names";
 
 const REVALIDATE = 60;
 
@@ -180,6 +180,14 @@ export async function getUsIndices(): Promise<Instrument[]> {
   return results.filter((r): r is Instrument => r !== null);
 }
 
+// Commodities (petróleo, oro, soja) — misma forma que los índices (Yahoo).
+export async function getCommodities(): Promise<Instrument[]> {
+  const results = await Promise.all(
+    COMMODITY_META.map((c) => getIndex(c.yahoo, c.symbol, c.name))
+  );
+  return results.filter((r): r is Instrument => r !== null);
+}
+
 // ---------- Sparklines de instrumentos ARG (Yahoo ticker .BA) ----------
 async function getSparkForSymbol(symbol: string): Promise<number[] | null> {
   try {
@@ -224,6 +232,7 @@ export async function getMarket(): Promise<MarketData> {
     bonos,
     letras,
     indices,
+    commodities,
   ] = await Promise.all([
     getDolares().catch(() => [] as DolarQuote[]),
     getRiesgoPais(),
@@ -233,6 +242,7 @@ export async function getMarket(): Promise<MarketData> {
     getData912("arg_bonds").catch(() => [] as Instrument[]),
     getData912("arg_notes").catch(() => [] as Instrument[]),
     getUsIndices().catch(() => [] as Instrument[]),
+    getCommodities().catch(() => [] as Instrument[]),
   ]);
 
   return {
@@ -244,6 +254,7 @@ export async function getMarket(): Promise<MarketData> {
     bonos,
     letras,
     indices,
+    commodities,
     generatedAt: new Date().toISOString(),
   };
 }
