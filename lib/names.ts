@@ -113,3 +113,20 @@ export const INDEX_META: { symbol: string; yahoo: string; name: string }[] = [
   { symbol: "RUT", yahoo: "^RUT", name: "Russell 2000" },
   { symbol: "VIX", yahoo: "^VIX", name: "VIX (volatilidad)" },
 ];
+
+// Descripción breve de cada instrumento del overview (índices + commodities),
+// keyeada por symbol. Se muestra en el modal de información de cada tarjeta.
+export const INSTRUMENT_INFO: Record<string, string> = {
+  // Índices USA
+  IXIC: "Índice que sigue a más de 3.000 acciones del mercado Nasdaq, con fuerte peso del sector tecnológico.",
+  NDX: "Las 100 mayores empresas no financieras del Nasdaq. Muy concentrado en tecnología (Apple, Microsoft, Nvidia).",
+  GSPC: "Las 500 empresas más grandes de EE.UU. Es la referencia principal del mercado accionario estadounidense.",
+  DJI: "Índice de 30 grandes empresas de EE.UU. Uno de los más antiguos y seguidos del mundo.",
+  RUT: "Mide 2.000 empresas de baja capitalización (small caps) de EE.UU. Termómetro de la economía doméstica.",
+  VIX: 'Mide la volatilidad esperada del S&P 500 a 30 días. Llamado "índice del miedo": sube con la incertidumbre.',
+  // Commodities
+  CL: "Crudo de referencia de EE.UU. (West Texas Intermediate). Cotiza en dólares por barril.",
+  BZ: "Crudo de referencia internacional, del Mar del Norte. Marca el precio global del petróleo.",
+  GC: "Metal precioso considerado refugio de valor. Cotiza en dólares por onza troy; suele subir en la incertidumbre.",
+  ZS: "Uno de los principales granos del mundo y exportación clave de Argentina. Cotiza en centavos de dólar por bushel.",
+};

@@ -1,6 +1,8 @@
 import type { DolarQuote, Instrument, RiesgoPais } from "@/lib/types";
 import { formatMoney, formatInt, formatPct } from "@/lib/format";
+import { INSTRUMENT_INFO } from "@/lib/names";
 import { ChangeBadge } from "./ChangeBadge";
+import { InfoButton } from "./InfoButton";
 import { Sparkline } from "./Sparkline";
 
 // Nombres cortos para que todas las tarjetas queden en una sola línea y alineadas
@@ -48,8 +50,13 @@ function RiesgoCard({
   inflacion: number | null;
 }) {
   return (
-    <div className="fadein rounded-2xl border border-brand/25 bg-gradient-to-br from-[var(--surface-2)] to-surface p-4">
-      <span className="text-sm font-semibold text-text-dim">Riesgo país</span>
+    <div className="fadein rounded-2xl border border-border bg-surface/70 p-4 backdrop-blur transition hover:border-brand/40 hover:bg-surface">
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-sm font-semibold text-text-dim">
+          Riesgo país
+        </span>
+        <span className="h-2 w-2 shrink-0 rounded-full bg-brand/70" />
+      </div>
       <div className="mt-2 flex items-baseline gap-1.5">
         <span className="tnum text-2xl font-bold tracking-tight sm:text-3xl">
           {riesgo ? formatInt(riesgo.valor) : "—"}
@@ -69,11 +76,15 @@ function RiesgoCard({
 
 function IndexChip({ i }: { i: Instrument }) {
   const up = (i.changePct ?? 0) >= 0;
+  const info = INSTRUMENT_INFO[i.symbol];
   return (
     <div className="fadein flex items-center justify-between gap-3 rounded-xl border border-border-soft bg-surface/50 px-3.5 py-2.5">
       <div className="min-w-0">
-        <div className="truncate text-xs font-semibold text-text-dim">
-          {i.name}
+        <div className="flex items-center gap-1.5">
+          <span className="truncate text-xs font-semibold text-text-dim">
+            {i.name}
+          </span>
+          {info && <InfoButton description={info} label={i.name} />}
         </div>
         <div className="tnum text-base font-bold">
           {i.price.toLocaleString("es-AR", { maximumFractionDigits: 2 })}
