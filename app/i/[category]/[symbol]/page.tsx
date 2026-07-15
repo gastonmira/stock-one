@@ -18,6 +18,7 @@ import { CompanyProfileCard } from "@/components/CompanyProfile";
 import { NewsList } from "@/components/NewsList";
 import { StatGrid } from "@/components/StatGrid";
 import { ChangeBadge } from "@/components/ChangeBadge";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { formatMoney } from "@/lib/format";
 
 export const revalidate = 60;
@@ -99,6 +100,7 @@ export default async function InstrumentPage({
               {formatMoney(inst.price, inst.currency)}
             </span>
             <ChangeBadge pct={inst.changePct} />
+            <ThemeSwitcher />
           </div>
         </div>
       </div>
@@ -110,7 +112,7 @@ export default async function InstrumentPage({
             <h1 className="text-3xl font-black tracking-tight">
               {inst.symbol}
             </h1>
-            <span className="rounded-md bg-white/5 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-text-mute">
+            <span className="rounded-md bg-surface-2/60 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-text-mute">
               {CATEGORY_LABELS[cat]}
             </span>
           </div>

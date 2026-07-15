@@ -134,7 +134,7 @@ export function Dashboard({ initial }: { initial: MarketData }) {
           {query ? (
             <button
               onClick={() => setQuery("")}
-              className="rounded-md px-2 py-1 text-xs text-text-mute hover:bg-white/5"
+              className="rounded-md px-2 py-1 text-xs text-text-mute hover:bg-surface-2/60"
             >
               Esc
             </button>
@@ -165,7 +165,7 @@ export function Dashboard({ initial }: { initial: MarketData }) {
                           <span className="font-semibold text-brand">
                             {r.symbol}
                           </span>
-                          <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-mute">
+                          <span className="rounded bg-surface-2/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-mute">
                             {CATEGORY_LABELS[r.category]}
                           </span>
                         </div>
