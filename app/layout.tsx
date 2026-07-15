@@ -15,6 +15,26 @@ const geistMono = Geist_Mono({
 
 const SITE_URL = "https://stockone-nu.vercel.app";
 
+const themeScript = `
+(function () {
+  var preference = "system";
+  try {
+    var stored = localStorage.getItem("stockone-theme");
+    if (stored === "light" || stored === "dark" || stored === "system") {
+      preference = stored;
+    }
+  } catch (error) {}
+
+  var resolved = preference === "system"
+    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    : preference;
+  var root = document.documentElement;
+  root.dataset.theme = resolved;
+  root.dataset.themePreference = preference;
+  root.style.colorScheme = resolved;
+})();
+`;
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
@@ -78,7 +98,11 @@ export default function RootLayout({
     <html
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-full flex flex-col">
         {children}
         <Analytics />

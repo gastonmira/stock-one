@@ -1,5 +1,6 @@
 import { getMarket } from "@/lib/sources";
 import { Dashboard } from "@/components/Dashboard";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 export const revalidate = 60;
 
@@ -39,9 +40,12 @@ export default async function Home() {
             Todos los valores financieros de Argentina, en un solo lugar.
           </p>
         </div>
-        <span className="hidden text-xs text-text-mute sm:block">
-          Datos en vivo · dólares, acciones, bonos, CEDEARs, riesgo país
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="hidden text-xs text-text-mute sm:block">
+            Datos en vivo · dólares, acciones, bonos, CEDEARs, riesgo país
+          </span>
+          <ThemeSwitcher />
+        </div>
       </header>
 
       <Dashboard initial={market} />

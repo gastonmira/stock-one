@@ -14,7 +14,7 @@ export function ChangeBadge({
   const flat = pct === 0;
   const color = flat ? "text-text-dim" : up ? "text-up" : "text-down";
   const bg = flat
-    ? "bg-white/5"
+    ? "bg-surface-2/60"
     : up
       ? "bg-[var(--up-bg)]"
       : "bg-[var(--down-bg)]";
