@@ -13,7 +13,7 @@
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "readby": "file:vendor/readby-9ddc803.tgz"
+    "readby": "file:vendor/readby-8c35e85.tgz"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
