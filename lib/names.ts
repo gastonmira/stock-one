@@ -97,6 +97,18 @@ export const STOCK_NAMES: Record<string, string> = {
   CAPX: "Capex",
 };
 
+// Nombres cortos de los dólares (casa de dolarapi → etiqueta). Cortos para que
+// las tarjetas queden en una sola línea; también se usan en la búsqueda.
+export const DOLAR_SHORT: Record<string, string> = {
+  blue: "Blue",
+  bolsa: "MEP",
+  contadoconliqui: "CCL",
+  oficial: "Oficial",
+  tarjeta: "Tarjeta",
+  mayorista: "Mayorista",
+  cripto: "Cripto",
+};
+
 export const COMMODITY_META: { symbol: string; yahoo: string; name: string }[] =
   [
     { symbol: "CL", yahoo: "CL=F", name: "Petróleo WTI" },
