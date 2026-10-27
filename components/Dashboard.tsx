@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import type { Category, Instrument, MarketData } from "@/lib/types";
 import { CATEGORY_LABELS } from "@/lib/types";
@@ -12,6 +12,29 @@ import { ChangeBadge } from "./ChangeBadge";
 import { formatMoney, timeAgo } from "@/lib/format";
 
 const TABS: Category[] = ["accion", "cedear", "bono", "letra", "indice"];
+
+// Reloj para "actualizado hace X". En el servidor y durante la hidratación vale
+// null: el HTML se cachea hasta 60s, así que un texto relativo calculado ahí no
+// coincide con el del navegador (React #418).
+let clock: number | null = null;
+
+function subscribeToClock(onChange: () => void) {
+  const tick = () => {
+    clock = Date.now();
+    onChange();
+  };
+  tick();
+  const id = setInterval(tick, 15_000);
+  return () => clearInterval(id);
+}
+
+function useNow(): number | null {
+  return useSyncExternalStore(
+    subscribeToClock,
+    () => clock,
+    () => null
+  );
+}
 
 function allInstruments(m: MarketData): Instrument[] {
   return [
@@ -27,7 +50,7 @@ export function Dashboard({ initial }: { initial: MarketData }) {
   const [market, setMarket] = useState<MarketData>(initial);
   const [tab, setTab] = useState<Category>("accion");
   const [query, setQuery] = useState("");
-  const [now, setNow] = useState(() => Date.now());
+  const now = useNow();
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-refresh cada 60s
@@ -40,12 +63,6 @@ export function Dashboard({ initial }: { initial: MarketData }) {
         /* silencioso */
       }
     }, 60_000);
-    return () => clearInterval(id);
-  }, []);
-
-  // tick para "actualizado hace X"
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(id);
   }, []);
 
@@ -95,11 +112,7 @@ export function Dashboard({ initial }: { initial: MarketData }) {
     indice: market.indices,
   };
 
-  const refreshedAt = useMemo(
-    () => timeAgo(market.generatedAt),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [market.generatedAt, now]
-  );
+  const refreshedAt = now == null ? null : timeAgo(market.generatedAt, now);
 
   return (
     <div className="space-y-8">
@@ -224,7 +237,8 @@ export function Dashboard({ initial }: { initial: MarketData }) {
               })}
             </div>
             <span className="text-xs text-text-mute">
-              Actualizado {refreshedAt} · se refresca solo cada 60s
+              {refreshedAt ? `Actualizado ${refreshedAt}` : "Datos en vivo"} · se
+              refresca solo cada 60s
             </span>
           </div>
           <InstrumentTable items={byCategory[tab]} />
