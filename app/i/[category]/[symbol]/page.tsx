@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import type { Category } from "@/lib/types";
 import { CATEGORY_LABELS } from "@/lib/types";
 import {
@@ -19,6 +18,7 @@ import { NewsList } from "@/components/NewsList";
 import { StatGrid } from "@/components/StatGrid";
 import { ChangeBadge } from "@/components/ChangeBadge";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { BackLink } from "@/components/BackLink";
 import { formatMoney } from "@/lib/format";
 
 export const revalidate = 60;
@@ -88,12 +88,7 @@ export default async function InstrumentPage({
       {/* Barra sticky: siempre visible para volver sin scrollear */}
       <div className="sticky top-0 z-30 border-b border-border-soft/70 bg-bg/80 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-text-dim transition hover:text-text"
-          >
-            ← Volver
-          </Link>
+          <BackLink />
           <div className="flex items-center gap-2.5">
             <span className="font-bold">{inst.symbol}</span>
             <span className="tnum text-sm font-semibold">

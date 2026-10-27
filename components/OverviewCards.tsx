@@ -1,20 +1,9 @@
 import type { DolarQuote, Instrument, RiesgoPais } from "@/lib/types";
 import { formatMoney, formatInt, formatPct } from "@/lib/format";
-import { INSTRUMENT_INFO } from "@/lib/names";
+import { DOLAR_SHORT, INSTRUMENT_INFO } from "@/lib/names";
 import { ChangeBadge } from "./ChangeBadge";
 import { InfoButton } from "./InfoButton";
 import { Sparkline } from "./Sparkline";
-
-// Nombres cortos para que todas las tarjetas queden en una sola línea y alineadas
-const DOLAR_SHORT: Record<string, string> = {
-  blue: "Blue",
-  bolsa: "MEP",
-  contadoconliqui: "CCL",
-  oficial: "Oficial",
-  tarjeta: "Tarjeta",
-  mayorista: "Mayorista",
-  cripto: "Cripto",
-};
 
 function DolarCard({ q }: { q: DolarQuote }) {
   const spread =

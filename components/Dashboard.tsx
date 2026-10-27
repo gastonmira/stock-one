@@ -1,9 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import type { Category, Instrument, MarketData } from "@/lib/types";
+import type { Category, DolarQuote, Instrument, MarketData } from "@/lib/types";
 import { CATEGORY_LABELS } from "@/lib/types";
+import { DOLAR_SHORT } from "@/lib/names";
+import {
+  LISTING_TABS,
+  LISTING_URL_KEY,
+  defaultAsc,
+  parseListing,
+  updateListing,
+  useLocationSearch,
+  type SortKey,
+} from "@/lib/listing";
 import { OverviewCards } from "./OverviewCards";
 import { InstrumentTable } from "./InstrumentTable";
 import { CurrencyConverter } from "./CurrencyConverter";
@@ -11,7 +21,46 @@ import { TopMovers } from "./TopMovers";
 import { ChangeBadge } from "./ChangeBadge";
 import { formatMoney, timeAgo } from "@/lib/format";
 
-const TABS: Category[] = ["accion", "cedear", "bono", "letra", "indice"];
+// Reloj para "actualizado hace X". En el servidor y durante la hidratación vale
+// null: el HTML se cachea hasta 60s, así que un texto relativo calculado ahí no
+// coincide con el del navegador (React #418).
+let clock: number | null = null;
+
+function subscribeToClock(onChange: () => void) {
+  const tick = () => {
+    clock = Date.now();
+    onChange();
+  };
+  tick();
+  const id = setInterval(tick, 15_000);
+  return () => clearInterval(id);
+}
+
+function useNow(): number | null {
+  return useSyncExternalStore(
+    subscribeToClock,
+    () => clock,
+    () => null
+  );
+}
+
+function normalize(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+// Puntaje de coincidencia de la búsqueda: exacto > prefijo > contiene.
+function matchScore(q: string, key: string, name: string): number {
+  if (key === q) return 100;
+  if (key.startsWith(q)) return 80;
+  if (name.startsWith(q)) return 60;
+  if (key.includes(q)) return 40;
+  if (name.includes(q)) return 30;
+  return -1;
+}
+
+type SearchResult =
+  | { kind: "instrument"; item: Instrument }
+  | { kind: "dolar"; item: DolarQuote; label: string };
 
 function allInstruments(m: MarketData): Instrument[] {
   return [
@@ -25,9 +74,12 @@ function allInstruments(m: MarketData): Instrument[] {
 
 export function Dashboard({ initial }: { initial: MarketData }) {
   const [market, setMarket] = useState<MarketData>(initial);
-  const [tab, setTab] = useState<Category>("accion");
-  const [query, setQuery] = useState("");
-  const [now, setNow] = useState(() => Date.now());
+  // Categoría, página, orden y búsqueda viven en la URL (lib/listing.ts).
+  const search = useLocationSearch();
+  const listing = useMemo(() => parseListing(search), [search]);
+  const { cat: tab, q: query } = listing;
+  const setQuery = (q: string) => updateListing({ q });
+  const now = useNow();
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-refresh cada 60s
@@ -43,12 +95,6 @@ export function Dashboard({ initial }: { initial: MarketData }) {
     return () => clearInterval(id);
   }, []);
 
-  // tick para "actualizado hace X"
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 15_000);
-    return () => clearInterval(id);
-  }, []);
-
   // Atajo "/" para enfocar búsqueda
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -56,35 +102,43 @@ export function Dashboard({ initial }: { initial: MarketData }) {
         e.preventDefault();
         inputRef.current?.focus();
       }
-      if (e.key === "Escape") setQuery("");
+      if (e.key === "Escape") updateListing({ q: "" });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Recordar la URL del listado para el "← Volver" de las fichas.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(LISTING_URL_KEY, `/${search}`);
+    } catch {}
+  }, [search]);
+
   const all = useMemo(() => allInstruments(market), [market]);
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
+  const results = useMemo((): SearchResult[] | null => {
+    const q = normalize(query.trim());
     if (!q) return null;
-    const scored = all
-      .map((i) => {
-        const sym = i.symbol.toLowerCase();
-        const name = i.name.toLowerCase();
-        let score = -1;
-        if (sym === q) score = 100;
-        else if (sym.startsWith(q)) score = 80;
-        else if (name.startsWith(q)) score = 60;
-        else if (sym.includes(q)) score = 40;
-        else if (name.includes(q)) score = 30;
-        return { i, score };
-      })
-      .filter((r) => r.score > 0)
+    // Dólares: por etiqueta corta ("MEP") o por nombre ("dólar bolsa").
+    const dolares = market.dolares.map((d) => {
+      const label = DOLAR_SHORT[d.casa] ?? d.nombre;
+      const score = Math.max(
+        matchScore(q, normalize(label), normalize(`dolar ${d.nombre}`)),
+        matchScore(q, normalize(`dolar ${label}`), "")
+      );
+      return { r: { kind: "dolar", item: d, label } as SearchResult, score };
+    });
+    const instruments = all.map((i) => ({
+      r: { kind: "instrument", item: i } as SearchResult,
+      score: matchScore(q, i.symbol.toLowerCase(), normalize(i.name)),
+    }));
+    return [...dolares, ...instruments]
+      .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 40)
-      .map((r) => r.i);
-    return scored;
-  }, [all, query]);
+      .map((x) => x.r);
+  }, [all, market.dolares, query]);
 
   const byCategory: Record<Category, Instrument[]> = {
     dolar: [],
@@ -95,11 +149,7 @@ export function Dashboard({ initial }: { initial: MarketData }) {
     indice: market.indices,
   };
 
-  const refreshedAt = useMemo(
-    () => timeAgo(market.generatedAt),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [market.generatedAt, now]
-  );
+  const refreshedAt = now == null ? null : timeAgo(market.generatedAt, now);
 
   return (
     <div className="space-y-8">
@@ -153,37 +203,63 @@ export function Dashboard({ initial }: { initial: MarketData }) {
               </div>
             ) : (
               <ul className="max-h-[420px] divide-y divide-border-soft/60 overflow-y-auto">
-                {results.map((r) => (
-                  <li key={r.id}>
-                    <Link
-                      href={`/i/${r.category}/${r.symbol}`}
-                      onClick={() => setQuery("")}
-                      className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-surface/60"
+                {results.map((res) =>
+                  res.kind === "dolar" ? (
+                    <li
+                      key={`dolar:${res.item.casa}`}
+                      className="flex items-center justify-between gap-3 px-3 py-2.5"
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-brand">
-                            {r.symbol}
+                            Dólar {res.label}
                           </span>
                           <span className="rounded bg-surface-2/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-mute">
-                            {CATEGORY_LABELS[r.category]}
+                            {CATEGORY_LABELS.dolar}
                           </span>
                         </div>
-                        {r.name !== r.symbol && (
+                        <div className="truncate text-xs text-text-mute">
+                          compra {formatMoney(res.item.compra, "ARS")}
+                        </div>
+                      </div>
+                      <div className="flex items-baseline gap-1.5 text-right">
+                        <span className="tnum font-medium">
+                          {formatMoney(res.item.venta, "ARS")}
+                        </span>
+                        <span className="text-xs text-text-mute">venta</span>
+                      </div>
+                    </li>
+                  ) : (
+                  <li key={res.item.id}>
+                    <Link
+                      href={`/i/${res.item.category}/${res.item.symbol}`}
+                      className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-surface/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-brand">
+                            {res.item.symbol}
+                          </span>
+                          <span className="rounded bg-surface-2/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-mute">
+                            {CATEGORY_LABELS[res.item.category]}
+                          </span>
+                        </div>
+                        {res.item.name !== res.item.symbol && (
                           <div className="truncate text-xs text-text-mute">
-                            {r.name}
+                            {res.item.name}
                           </div>
                         )}
                       </div>
                       <div className="flex items-center gap-3 text-right">
                         <span className="tnum font-medium">
-                          {formatMoney(r.price, r.currency)}
+                          {formatMoney(res.item.price, res.item.currency)}
                         </span>
-                        <ChangeBadge pct={r.changePct} />
+                        <ChangeBadge pct={res.item.changePct} />
                       </div>
                     </Link>
                   </li>
-                ))}
+                  )
+                )}
               </ul>
             )}
           </div>
@@ -203,12 +279,14 @@ export function Dashboard({ initial }: { initial: MarketData }) {
         <div>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
-              {TABS.map((t) => {
+              {LISTING_TABS.map((t) => {
                 const active = t === tab;
                 return (
                   <button
                     key={t}
-                    onClick={() => setTab(t)}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => updateListing({ cat: t, page: 0 })}
                     className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
                       active
                         ? "bg-brand text-bg"
@@ -224,10 +302,24 @@ export function Dashboard({ initial }: { initial: MarketData }) {
               })}
             </div>
             <span className="text-xs text-text-mute">
-              Actualizado {refreshedAt} · se refresca solo cada 60s
+              {refreshedAt ? `Actualizado ${refreshedAt}` : "Datos en vivo"} · se
+              refresca solo cada 60s
             </span>
           </div>
-          <InstrumentTable items={byCategory[tab]} />
+          <InstrumentTable
+            items={byCategory[tab]}
+            sortKey={listing.sort}
+            asc={listing.asc}
+            page={listing.page}
+            onSortChange={(key: SortKey) =>
+              updateListing({
+                sort: key,
+                asc: key === listing.sort ? !listing.asc : defaultAsc(key),
+                page: 0,
+              })
+            }
+            onPageChange={(page) => updateListing({ page })}
+          />
         </div>
       )}
     </div>
