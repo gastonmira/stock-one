@@ -12,6 +12,16 @@ function isTheme(value: string | undefined): value is Theme {
   return value === "light" || value === "dark";
 }
 
+function readStoredPreference(): ThemePreference {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === "system" || isTheme(stored ?? undefined)) {
+      return stored as ThemePreference;
+    }
+  } catch {}
+  return "system";
+}
+
 function resolveTheme(preference: ThemePreference): Theme {
   if (preference !== "system") return preference;
   return window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -59,6 +69,11 @@ export function ThemeSwitcher() {
     () => "light",
   );
   useEffect(() => {
+    // El script de <head> aplica el tema antes de pintar, pero si React vuelve a
+    // montar <html> (p. ej. tras un error de hidratación) se pierden sus atributos.
+    if (!document.documentElement.dataset.theme) {
+      applyTheme(readStoredPreference());
+    }
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const handleSystemChange = () => {
       if (document.documentElement.dataset.themePreference === "system") {

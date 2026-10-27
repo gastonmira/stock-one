@@ -39,11 +39,14 @@ export function formatInt(value: number | null | undefined): string {
   return Math.round(value).toLocaleString(AR);
 }
 
-export function timeAgo(iso: string | null | undefined): string {
+export function timeAgo(
+  iso: string | null | undefined,
+  now: number = Date.now()
+): string {
   if (!iso) return "";
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
-  const secs = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  const secs = Math.max(0, Math.floor((now - then) / 1000));
   if (secs < 60) return `hace ${secs}s`;
   const mins = Math.floor(secs / 60);
   if (mins < 60) return `hace ${mins} min`;
