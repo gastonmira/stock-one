@@ -23,6 +23,21 @@ import { formatMoney } from "@/lib/format";
 
 export const revalidate = 60;
 
+const AR_DATE = new Intl.DateTimeFormat("es-AR", {
+  timeZone: "America/Argentina/Buenos_Aires",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+const AR_DATETIME = new Intl.DateTimeFormat("es-AR", {
+  timeZone: "America/Argentina/Buenos_Aires",
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
 const VALID: Category[] = ["accion", "cedear", "bono", "letra", "indice"];
 const WITH_CHART: Category[] = ["accion", "cedear", "indice"];
 
@@ -69,7 +84,10 @@ export default async function InstrumentPage({
   const isIndex = cat === "indice";
   const histSymbol = isIndex ? yahooForIndex(inst.symbol) : inst.symbol;
 
-  const isCompany = cat === "accion" || cat === "cedear";
+  const hasName = !!inst.name && inst.name !== inst.symbol;
+  // Sin un nombre conocido no buscamos reseña: con el ticker solo, Wikipedia
+  // devuelve cualquier cosa (CRM → SugarCRM, INTR → Administración de empresas).
+  const isCompany = (cat === "accion" || cat === "cedear") && hasName;
 
   const [history, news, profile] = await Promise.all([
     supportsChart
@@ -77,11 +95,30 @@ export default async function InstrumentPage({
       : Promise.resolve<History>({ t: [], c: [] }),
     getNews(newsQueryFor(cat, inst.symbol, inst.name)),
     isCompany
-      ? getCompanyProfile(inst.name || inst.symbol)
+      ? getCompanyProfile(inst.name)
       : Promise.resolve<CompanyProfile | null>(null),
   ]);
 
-  const hasName = inst.name && inst.name !== inst.symbol;
+  // Fuente, moneda y fecha de cada dato: la cotización y el histórico vienen de
+  // fuentes distintas y no siempre de la misma sesión. Horarios de Argentina.
+  const quoteNote = isIndex
+    ? `Yahoo Finance, en dólares${
+        inst.updatedAt
+          ? `; sesión del ${AR_DATETIME.format(new Date(inst.updatedAt))}`
+          : ""
+      }.`
+    : `data912 (BYMA), en pesos, en vivo; consultado el ${AR_DATETIME.format(
+        new Date()
+      )}. El cierre previo se deduce de la variación informada.`;
+  const lastBar = history.t.length ? history.t[history.t.length - 1] : null;
+  const historyNote =
+    lastBar != null
+      ? `cierres diarios de Yahoo Finance (${
+          isIndex ? histSymbol : `${histSymbol}.BA, en pesos`
+        }); último cierre del ${AR_DATE.format(
+          new Date(lastBar * 1000)
+        )}. Puede ir una sesión detrás de la cotización en vivo.`
+      : null;
 
   return (
     <>
@@ -159,6 +196,10 @@ export default async function InstrumentPage({
             Estadísticas
           </h2>
           <StatGrid inst={inst} history={history} />
+          <ul className="mt-3 space-y-1 text-xs text-text-mute">
+            <li>Precio, variación del día y cierre previo: {quoteNote}</li>
+            {historyNote && <li>Gráfico y máx./mín.: {historyNote}</li>}
+          </ul>
         </section>
 
         <section>

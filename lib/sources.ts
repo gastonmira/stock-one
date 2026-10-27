@@ -102,20 +102,30 @@ export async function getData912(kind: Data912Kind): Promise<Instrument[]> {
   const category = KIND_TO_CATEGORY[kind];
   return rows
     .filter((r) => r && r.symbol && typeof r.c === "number")
-    .map((r) => ({
-      id: `${category}:${r.symbol}`,
-      symbol: r.symbol,
-      name: nameFor(kind, r.symbol),
-      category,
-      price: r.c,
-      changePct: typeof r.pct_change === "number" ? r.pct_change : null,
-      currency: "ARS" as const,
-      extra: {
-        bid: r.px_bid ?? null,
-        ask: r.px_ask ?? null,
-        volumen: r.v ?? null,
-      },
-    }));
+    .map((r) => {
+      const changePct =
+        typeof r.pct_change === "number" ? r.pct_change : null;
+      return {
+        id: `${category}:${r.symbol}`,
+        symbol: r.symbol,
+        name: nameFor(kind, r.symbol),
+        category,
+        price: r.c,
+        changePct,
+        // data912 no publica el cierre anterior: se deduce de su propia variación,
+        // así precio, variación y cierre previo salen de la misma sesión y fuente.
+        prevClose:
+          changePct != null && changePct > -100
+            ? r.c / (1 + changePct / 100)
+            : null,
+        currency: "ARS" as const,
+        extra: {
+          bid: r.px_bid ?? null,
+          ask: r.px_ask ?? null,
+          volumen: r.v ?? null,
+        },
+      };
+    });
 }
 
 // ---------- Índices USA (Yahoo Finance) ----------
@@ -126,11 +136,38 @@ interface YahooChart {
         regularMarketPrice: number;
         chartPreviousClose: number;
         regularMarketTime: number;
+        gmtoffset?: number;
       };
       timestamp?: number[];
       indicators: { quote: { close: (number | null)[] }[] };
     }[];
   };
+}
+
+/**
+ * Cierre de la sesión anterior a la de regularMarketTime, tomado de las barras
+ * diarias. No usamos meta.chartPreviousClose: es el cierre previo al INICIO del
+ * rango pedido (range=1mo → hace un mes), no el de ayer.
+ */
+function previousSessionClose(
+  meta: { regularMarketTime: number; gmtoffset?: number },
+  timestamps: number[] | undefined,
+  closes: (number | null)[]
+): number | null {
+  const bars: { t: number; c: number }[] = [];
+  (timestamps ?? []).forEach((t, i) => {
+    const c = closes[i];
+    if (typeof c === "number") bars.push({ t, c });
+  });
+  if (bars.length === 0) return null;
+  const offset = meta.gmtoffset ?? 0;
+  const day = (sec: number) => Math.floor((sec + offset) / 86400);
+  const last = bars[bars.length - 1];
+  // Si la última barra es la sesión actual, el cierre previo es la anterior.
+  if (day(last.t) === day(meta.regularMarketTime)) {
+    return bars.length >= 2 ? bars[bars.length - 2].c : null;
+  }
+  return last.c;
 }
 
 async function getIndex(
@@ -146,13 +183,13 @@ async function getIndex(
     );
     const result = data.chart.result?.[0];
     if (!result) return null;
-    const { regularMarketPrice, chartPreviousClose, regularMarketTime } =
-      result.meta;
-    const changePct =
-      chartPreviousClose && chartPreviousClose !== 0
-        ? ((regularMarketPrice - chartPreviousClose) / chartPreviousClose) * 100
-        : null;
-    const spark = (result.indicators.quote?.[0]?.close ?? [])
+    const { regularMarketPrice, regularMarketTime } = result.meta;
+    const closes = result.indicators.quote?.[0]?.close ?? [];
+    const prevClose = previousSessionClose(result.meta, result.timestamp, closes);
+    const changePct = prevClose
+      ? ((regularMarketPrice - prevClose) / prevClose) * 100
+      : null;
+    const spark = closes
       .filter((n): n is number => typeof n === "number")
       .slice(-30);
     return {
@@ -162,6 +199,7 @@ async function getIndex(
       category: "indice",
       price: regularMarketPrice,
       changePct,
+      prevClose,
       currency: "USD",
       updatedAt: regularMarketTime
         ? new Date(regularMarketTime * 1000).toISOString()
@@ -511,6 +549,34 @@ async function fetchWiki(queryPart: string): Promise<WikiPage[]> {
   return Object.values(json.query?.pages ?? {});
 }
 
+// Palabras genéricas que no identifican a una empresa ("Grupo", "Banco", "S.A."…).
+const NAME_STOPWORDS = new Set([
+  "grupo", "financiero", "banco", "compania", "sociedad", "empresa", "holding",
+  "the", "de", "del", "la", "las", "el", "los", "y", "sa", "inc", "corp", "co",
+]);
+
+function normalize(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * El título del artículo tiene que contener la palabra distintiva del nombre
+ * (la primera que no es genérica): "Grupo Supervielle" → "supervielle". Evita
+ * que el search devuelva otra entidad que solo "parece empresa".
+ */
+function titleMatchesName(title: string, name: string): boolean {
+  const key = normalize(name)
+    .split(" ")
+    .find((w) => w && !NAME_STOPWORDS.has(w));
+  if (!key) return false;
+  return normalize(title).replace(/ /g, "").includes(key);
+}
+
 function isValidCompanyPage(page: WikiPage): boolean {
   return (
     !page.missing &&
@@ -523,8 +589,10 @@ function isValidCompanyPage(page: WikiPage): boolean {
 /**
  * Reseña + industria de una empresa desde Wikipedia en español.
  * Estrategia: título exacto primero; si no valida como empresa, un search
- * acotado con guard estricto. Si nada es una empresa confiable → null
- * (mejor no mostrar nada que mostrar info equivocada, ej: Agrometal → Monte Maíz).
+ * acotado con guard estricto. Cada candidato tiene que ser una empresa y su
+ * título tiene que nombrarla. Si nada es confiable → null (mejor no mostrar nada
+ * que mostrar info equivocada, ej: Agrometal → Monte Maíz, Supervielle → Contrapedal).
+ * `name` tiene que ser el nombre de la empresa, no el ticker.
  */
 export async function getCompanyProfile(
   name: string
@@ -533,8 +601,10 @@ export async function getCompanyProfile(
   try {
     // Paso 1: título exacto.
     const byTitle = await fetchWiki(`titles=${encodeURIComponent(name)}`);
+    const isMatch = (page: WikiPage) =>
+      isValidCompanyPage(page) && titleMatchesName(page.title, name);
     const exact = byTitle[0];
-    if (exact && isValidCompanyPage(exact)) return toProfile(exact);
+    if (exact && isMatch(exact)) return toProfile(exact);
 
     // Paso 2: search acotado, validando que cada candidato sea empresa.
     const bySearch = await fetchWiki(
@@ -542,7 +612,7 @@ export async function getCompanyProfile(
         `${name} empresa`
       )}`
     );
-    const match = bySearch.find(isValidCompanyPage);
+    const match = bySearch.find(isMatch);
     return match ? toProfile(match) : null;
   } catch {
     return null;

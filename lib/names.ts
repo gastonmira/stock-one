@@ -49,6 +49,7 @@ export const CEDEAR_NAMES: Record<string, string> = {
   YPF: "YPF (ADR)",
   PBR: "Petrobras",
   KOF: "Coca-Cola Femsa",
+  CRM: "Salesforce",
 };
 
 export const STOCK_NAMES: Record<string, string> = {
@@ -95,6 +96,8 @@ export const STOCK_NAMES: Record<string, string> = {
   CARC: "Carboclor",
   LEDE: "Ledesma",
   CAPX: "Capex",
+  CELU: "Celulosa Argentina",
+  INTR: "Compañía Introductora de Buenos Aires",
 };
 
 export const COMMODITY_META: { symbol: string; yahoo: string; name: string }[] =
