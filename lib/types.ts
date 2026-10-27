@@ -7,6 +7,8 @@ export interface Instrument {
   category: Category;
   price: number;
   changePct: number | null;
+  /** Cierre de la sesión anterior, de la misma fuente que price/changePct. */
+  prevClose?: number | null;
   currency: "ARS" | "USD";
   extra?: Record<string, number | string | null>;
   updatedAt?: string;

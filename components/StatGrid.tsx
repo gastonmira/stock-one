@@ -26,8 +26,9 @@ export function StatGrid({
   const closes = history.c;
   const hi = closes.length ? Math.max(...closes) : null;
   const lo = closes.length ? Math.min(...closes) : null;
-  const prevClose =
-    closes.length >= 2 ? closes[closes.length - 2] : null;
+  // De la misma fuente que el precio y la variación (no del histórico, que puede
+  // ir una sesión atrasado respecto de la cotización en vivo).
+  const prevClose = inst.prevClose ?? null;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -42,10 +43,10 @@ export function StatGrid({
         <Stat label="Volumen" value={formatInt(Number(vol))} />
       )}
       {hi != null && (
-        <Stat label="Máx (rango)" value={formatMoney(hi, cur)} />
+        <Stat label="Máx (6 meses)" value={formatMoney(hi, cur)} />
       )}
       {lo != null && (
-        <Stat label="Mín (rango)" value={formatMoney(lo, cur)} />
+        <Stat label="Mín (6 meses)" value={formatMoney(lo, cur)} />
       )}
       {prevClose != null && (
         <Stat label="Cierre previo" value={formatMoney(prevClose, cur)} />
