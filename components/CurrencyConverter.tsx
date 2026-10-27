@@ -11,35 +11,64 @@ const CASAS: { casa: string; label: string }[] = [
   { casa: "oficial", label: "Oficial" },
 ];
 
-// Formatea lo que se escribe con separador de miles es-AR ("151000" -> "151.000",
-// "151000,5" -> "151.000,5"), preservando el decimal que el usuario tipea.
-function formatInput(raw: string): string {
-  let s = raw.replace(/[^\d,]/g, "");
-  const firstComma = s.indexOf(",");
-  if (firstComma !== -1) {
-    s =
-      s.slice(0, firstComma + 1) +
-      s.slice(firstComma + 1).replace(/,/g, "");
-  }
-  const [intPart, decPart] = s.split(",");
-  const intFmt = intPart ? Number(intPart).toLocaleString("es-AR") : "";
-  if (s.includes(",")) {
-    return `${intFmt || "0"},${(decPart ?? "").slice(0, 2)}`;
-  }
-  return intFmt;
-}
+type ParsedAmount =
+  | { kind: "empty" }
+  | { kind: "error"; message: string }
+  | { kind: "ok"; value: number; hint: string | null };
 
-// El input siempre viene formateado es-AR (punto = miles, coma = decimal),
-// así que quitamos los puntos y pasamos la coma a punto: "1.500.000,5" -> 1500000.5
-function parseAmount(raw: string): number {
-  const s = raw.replace(/\./g, "").replace(",", ".").trim();
-  if (!s) return NaN;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : NaN;
+// Miles con punto en grupos de 3: "1.000", "1.500.000".
+const THOUSANDS = /^\d{1,3}(\.\d{3})+$/;
+
+// Interpreta el importe sin reescribirlo mientras se tipea. Formato local es-AR
+// (punto = miles, coma = decimal). Un punto que no puede ser de miles ("1.5") se
+// toma como decimal y se avisa; nunca se descarta un carácter en silencio.
+function parseAmount(raw: string): ParsedAmount {
+  const s = raw.replace(/\s/g, "");
+  if (!s) return { kind: "empty" };
+  if (s.includes("-")) {
+    return { kind: "error", message: "Ingresá un importe positivo, sin signo menos." };
+  }
+  if (!/^[\d.,]+$/.test(s)) {
+    return { kind: "error", message: "Usá solo números, con coma para los decimales." };
+  }
+  const invalid: ParsedAmount = {
+    kind: "error",
+    message: "No se reconoce el formato. Ejemplos: 1500 · 1.500 · 1.500,50 · 1,5",
+  };
+
+  if (s.includes(",")) {
+    const parts = s.split(",");
+    if (parts.length > 2) return invalid;
+    const [intPart, decPart] = parts;
+    if (intPart && !/^\d+$/.test(intPart) && !THOUSANDS.test(intPart)) return invalid;
+    if (!/^\d*$/.test(decPart)) return invalid;
+    const value = Number(`${intPart.replace(/\./g, "") || "0"}.${decPart || "0"}`);
+    return { kind: "ok", value, hint: null };
+  }
+
+  if (/^\d+$/.test(s)) return { kind: "ok", value: Number(s), hint: null };
+  if (THOUSANDS.test(s)) {
+    const value = Number(s.replace(/\./g, ""));
+    return {
+      kind: "ok",
+      value,
+      hint: `Se interpreta como ${formatNumber(value, 8)} (el punto separa miles).`,
+    };
+  }
+  const dots = s.split(".");
+  if (dots.length === 2 && dots[0] !== "") {
+    const value = Number(s);
+    return {
+      kind: "ok",
+      value,
+      hint: `Se interpreta como ${formatNumber(value, 8)} (punto como decimal).`,
+    };
+  }
+  return invalid;
 }
 
 export function CurrencyConverter({ dolares }: { dolares: DolarQuote[] }) {
-  const [amount, setAmount] = useState(() => formatInput("100"));
+  const [amount, setAmount] = useState("100");
   const [currency, setCurrency] = useState<"USD" | "ARS">("USD");
 
   const quotes = useMemo(() => {
@@ -50,8 +79,11 @@ export function CurrencyConverter({ dolares }: { dolares: DolarQuote[] }) {
     })).filter((q) => q.venta != null);
   }, [dolares]);
 
-  const value = parseAmount(amount);
-  const valid = Number.isFinite(value) && value >= 0;
+  const parsed = parseAmount(amount);
+  const valid = parsed.kind === "ok";
+  const value = valid ? parsed.value : NaN;
+  const message =
+    parsed.kind === "error" ? parsed.message : valid ? parsed.hint : null;
 
   return (
     <section>
@@ -60,12 +92,23 @@ export function CurrencyConverter({ dolares }: { dolares: DolarQuote[] }) {
       </h2>
       <div className="rounded-2xl border border-border bg-surface/50 p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-1 items-center gap-2 rounded-xl border border-border bg-bg-elev/60 px-3 py-2 focus-within:border-brand/50">
+          <div
+            className={`flex flex-1 items-center gap-2 rounded-xl border bg-bg-elev/60 px-3 py-2 ${
+              parsed.kind === "error"
+                ? "border-down/60"
+                : "border-border focus-within:border-brand/50"
+            }`}
+          >
             <input
               value={amount}
-              onChange={(e) => setAmount(formatInput(e.target.value))}
+              onChange={(e) => setAmount(e.target.value)}
+              // Al salir del campo, mostrar el importe en formato local (1.500,5).
+              onBlur={() => valid && setAmount(formatNumber(value, 8))}
               inputMode="decimal"
               placeholder="0"
+              aria-label="Importe a convertir"
+              aria-invalid={parsed.kind === "error"}
+              aria-describedby={message ? "conversor-ayuda" : undefined}
               className="tnum w-full min-w-0 bg-transparent text-xl font-bold outline-none"
             />
           </div>
@@ -85,6 +128,18 @@ export function CurrencyConverter({ dolares }: { dolares: DolarQuote[] }) {
             ))}
           </div>
         </div>
+
+        {message && (
+          <p
+            id="conversor-ayuda"
+            role={parsed.kind === "error" ? "alert" : undefined}
+            className={`mt-2 text-xs ${
+              parsed.kind === "error" ? "text-down" : "text-text-mute"
+            }`}
+          >
+            {message}
+          </p>
+        )}
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {quotes.map((q) => {
